@@ -3,6 +3,9 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/bitcoinfees/feesim/api"
@@ -52,30 +55,80 @@ func main() {
 		log.Fatal("Need to specify RRD file with -f.")
 	}
 
+	err := initRRD(rrdfile)
+	if err != nil {
+		if os.IsExist(err) {
+			log.Printf("Existing RRD file found at %s.", rrdfile)
+		} else {
+			log.Fatal(err)
+		}
+	} else {
+		log.Printf("Creating new RRD file at %s", rrdfile)
+	}
+
 	cfg := api.Config{Host: host, Port: port, Timeout: 15}
 	client := api.NewClient(cfg)
+	done := make(chan struct{})
 
-	if err := collect(time.Now().Unix(), rrdfile, client); err != nil {
-		log.Fatal(err)
+	// Signal handling
+	sigc := make(chan os.Signal, 3)
+	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	go func() {
+		<-sigc
+		close(done)
+	}()
+
+	run(rrdfile, client, done)
+	log.Println("All done")
+}
+
+func run(rrdfile string, client *api.Client, done <-chan struct{}) {
+	log.Println("Starting rrd collection..")
+	for {
+		t := time.Now().Unix()
+		nextUpdate := t - t%step + step
+		tc := time.After(time.Duration(nextUpdate-t) * time.Second)
+		select {
+		case <-tc:
+		case <-done:
+			return
+		}
+		args, err := collect(nextUpdate, client)
+		if err != nil {
+			log.Println("[ERROR]", err)
+			args = make([]interface{}, 12)
+			args[0] = nextUpdate
+			for i := range args {
+				if i > 0 {
+					args[i] = "U"
+				}
+			}
+		}
+		u := rrd.NewUpdater(rrdfile)
+		if err := u.Update(args...); err != nil {
+			log.Println("[ERROR]", err)
+		} else {
+			log.Println(args)
+		}
 	}
 }
 
-func collect(t int64, rrdfile string, client *api.Client) error {
+func collect(t int64, client *api.Client) ([]interface{}, error) {
 	r, err := client.EstimateFee(0)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	state, err := client.MempoolState()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	txrate, err := client.TxRate(0)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	caprate, err := client.CapRate(0)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	result := r.([]interface{})
@@ -85,8 +138,8 @@ func collect(t int64, rrdfile string, client *api.Client) error {
 	for i, ridx := range []int{0, 1, 2, 5} {
 		r := result[ridx].(float64)
 		if r < 0 {
-			fees[i] = -1
-			mempoolSizes[i] = -1
+			fees[i] = "U"
+			mempoolSizes[i] = "U"
 			continue
 		}
 		rsats := r * coin
@@ -104,6 +157,5 @@ func collect(t int64, rrdfile string, client *api.Client) error {
 	args = append(args, mempoolSizes...)
 	args = append(args, txbyterate)
 	args = append(args, capbyterate)
-	log.Println(args...)
-	return nil
+	return args, nil
 }
