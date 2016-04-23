@@ -1,0 +1,13 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/ziutek/rrd",
+			"repository": "https://github.com/ziutek/rrd",
+			"vcs": "git",
+			"revision": "9b5311f435c8f7e62f71ffe15b4566e6cf840738",
+			"branch": "master",
+			"notests": true
+		}
+	]
+}
