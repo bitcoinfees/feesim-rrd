@@ -33,7 +33,7 @@ func initRRD(rrdfile string) error {
 
 	c.RRA("AVERAGE", 0.5, 1, 10080)    // 1 week of 1 min data
 	c.RRA("AVERAGE", 0.5, 30, 17520)   // 1 year of 30 min data
-	c.RRA("AVERAGE", 0.5, 180, 14600)  // 10 years of 3h data
+	c.RRA("AVERAGE", 0.5, 180, 14600)  // 5 years of 3h data
 	c.RRA("AVERAGE", 0.5, 1440, 18250) // 50 years of daily data
 	c.RRA("MIN", 0.5, 1440, 18250)
 	c.RRA("MAX", 0.5, 1440, 18250)
