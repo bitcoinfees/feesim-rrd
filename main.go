@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -13,8 +14,9 @@ import (
 )
 
 const (
-	step = 60
-	coin = 100000000
+	step    = 60
+	coin    = 100000000
+	version = "0.1.0"
 )
 
 func initRRD(rrdfile string) error {
@@ -50,6 +52,11 @@ func main() {
 	flag.StringVar(&host, "host", "localhost", "Feesim RPC host address.")
 	flag.StringVar(&port, "port", "8350", "Feesim RPC port.")
 	flag.Parse()
+
+	if flag.Arg(0) == "version" {
+		fmt.Println(version)
+		os.Exit(0)
+	}
 
 	if rrdfile == "" {
 		log.Fatal("Need to specify RRD file with -f.")
